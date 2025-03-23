@@ -12,3 +12,22 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model Team {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  shirtColor String
+  Player     Player[] // One-to-many: A team has many players
+}
+
+model Player {
+  id      String @id @default(uuid())
+  name    String
+  position String
+  age     Int @default(18)
+  salary  Float @default(0)
+  teamId  String
+  team    Team   @relation(fields: [teamId], references: [id]) // Foreign key to Team
+
+  @@unique([name,teamId])
+}
