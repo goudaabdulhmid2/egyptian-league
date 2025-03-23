@@ -4,11 +4,13 @@
   "description": "mid project advanced level",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "nodemon src/server.ts"
   },
   "author": "goudaabdulhmid2",
   "license": "ISC",
   "devDependencies": {
+    "@types/express": "^5.0.1",
+    "@types/morgan": "^1.9.9",
     "eslint": "^8.57.1",
     "eslint-config-airbnb": "^19.0.4",
     "eslint-config-prettier": "^10.1.1",
@@ -26,6 +28,7 @@
   "dependencies": {
     "@prisma/client": "^6.5.0",
     "dotenv": "^16.4.7",
+    "express": "^4.21.2",
     "morgan": "^1.10.0"
   }
 }
