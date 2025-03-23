@@ -1,6 +1,5 @@
 import express, { Application } from "express";
 import { Server } from "http";
-import { resolve } from "path";
 
 class Config {
   private readonly PORT: number = Number(process.env.PORT) || 3000;
