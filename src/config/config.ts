@@ -7,7 +7,7 @@ class Config {
   private static instance: Config | null = null;
   private server: Server | null = null;
 
-  constructor() {}
+  private constructor() {}
 
   public static getInstance(): Config {
     if (!Config.instance) {
