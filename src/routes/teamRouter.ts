@@ -3,14 +3,14 @@ import { Router } from "express";
 import {
   getAllTeams,
   getTeamById,
-  newTeam,
+  createTeam,
   deleteTeamById,
   updateTeamByID,
 } from "../controllers/teamConroller";
 
 const router = Router();
 
-router.route("/").get(getAllTeams).post(newTeam);
+router.route("/").get(getAllTeams).post(createTeam);
 router
   .route("/:id")
   .get(getTeamById)

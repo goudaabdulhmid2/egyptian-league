@@ -2,26 +2,94 @@ import { Request, Response, NextFunction } from "express";
 
 import ApiError from "../utils/apiError";
 import { Prisma } from "@prisma/client";
+import { PrismaErrorCode, AppErrorCode } from "../types/errorTypes";
+
+const prismaErrorMap = new Map([
+  [
+    PrismaErrorCode.NOT_FOUND,
+    {
+      message: "Record not found",
+      statusCode: 404,
+      errorCode: AppErrorCode.RECORD_NOT_FOUND,
+    },
+  ],
+  [
+    PrismaErrorCode.UNIQUE_CONSTRAINT,
+    {
+      message: (field: string) => `Duplicate entry for ${field}`,
+      statusCode: 400,
+      errorCode: AppErrorCode.DUPLICATE_ENTRY,
+    },
+  ],
+  [
+    PrismaErrorCode.FOREIGN_KEY,
+    {
+      message: (field: string) => `Invalid foreign key for ${field}`,
+      statusCode: 400,
+      errorCode: AppErrorCode.FOREIGN_KEY_ERROR,
+    },
+  ],
+  [
+    PrismaErrorCode.INVALID_VALUE,
+    {
+      message: (field: string) => `Invalid value for ${field}`,
+      statusCode: 400,
+      errorCode: AppErrorCode.INVALID_VALUE,
+    },
+  ],
+  [
+    PrismaErrorCode.VALUE_TOO_LONG,
+    {
+      message: (field: string) => `Value too long for ${field}`,
+      statusCode: 400,
+      errorCode: AppErrorCode.VALUE_TOO_LONG,
+    },
+  ],
+  [
+    PrismaErrorCode.VALUE_TOO_SHORT,
+    {
+      message: (field: string) => `Value too short for ${field}`,
+      statusCode: 400,
+      errorCode: AppErrorCode.VALUE_TOO_SHORT,
+    },
+  ],
+]);
+
+const handlePrismaError = (
+  err: Prisma.PrismaClientKnownRequestError
+): ApiError => {
+  const errorConfig = prismaErrorMap.get(err.code as PrismaErrorCode);
+
+  if (errorConfig) {
+    const message =
+      typeof errorConfig.message === "function"
+        ? errorConfig.message(
+            err.meta?.target && Array.isArray(err.meta.target)
+              ? err.meta.target[0]
+              : "unknown field"
+          )
+        : errorConfig.message;
+    return new ApiError(
+      message,
+      errorConfig.statusCode,
+      "fail",
+      true,
+      errorConfig.errorCode
+    );
+  }
+  return new ApiError(
+    "Database error",
+    500,
+    "error",
+    false,
+    AppErrorCode.DATABASE_ERROR
+  );
+};
 
 const handleNonApiError = (err: Error): ApiError => {
   // Handel Prisma-specific errors
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
-    if (err.code === "P2025") {
-      return new ApiError(
-        "Record not found",
-        404,
-        "fail",
-        true,
-        "RECORD_NOT_FOUND"
-      );
-    }
-    return new ApiError(
-      "Database error",
-      500,
-      "error",
-      false,
-      "DATABASE_ERROR"
-    );
+    return handlePrismaError(err);
   }
   return new ApiError(
     err.message || "Something went wrong",
