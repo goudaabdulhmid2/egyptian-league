@@ -4,6 +4,7 @@ import morgan from "morgan";
 import config from "./config/config";
 import errorHandler from "./middleware/errorHandler";
 import ApiError from "./utils/apiError";
+import teamRouter from "./routes/teamRouter";
 
 const app = config.getApp();
 
@@ -13,6 +14,8 @@ app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
+
+app.use("/api/v1/teams", teamRouter);
 
 app.all("*", (req: Request, res: Response, next: NextFunction) => {
   next(

@@ -1,11 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 
 class Database {
-  private static instance: Database | null = null;
+  private static instance: PrismaClient | null = null;
 
   private constructor() {}
 
-  public static getInstance(): Database {
+  public static getInstance(): PrismaClient {
     if (!Database.instance) {
       Database.instance = new PrismaClient();
     }

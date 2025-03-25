@@ -8,5 +8,11 @@ export interface Team {
 }
 
 export interface TeamUpdateInput {
+  name?: string;
   shirtColor?: string;
+}
+
+export interface TeamCreateInput {
+  name: string;
+  shirtColor: string;
 }
