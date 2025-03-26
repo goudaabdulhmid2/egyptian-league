@@ -2,7 +2,41 @@ import { Request, Response, NextFunction } from "express";
 
 import ApiError from "../utils/apiError";
 import { Prisma } from "@prisma/client";
-import { PrismaErrorCode, AppErrorCode } from "../types/errorTypes";
+import {
+  PrismaErrorCode,
+  AppErrorCode,
+  ErrorResponse,
+} from "../types/errorTypes";
+
+// Common error response formatter
+const formatErrorResponse = (
+  err: ApiError,
+  includeDetails: boolean = false
+): ErrorResponse => {
+  const response: ErrorResponse = {
+    status: err.status,
+    message: err.message,
+    timestamp: err.timestamp || new Date(),
+    errorCode: err.errorCode,
+    details: err.details,
+  };
+
+  if (includeDetails) {
+    response.stack = err.stack;
+    response.error = err;
+  }
+
+  return response;
+};
+
+// Separate error message formatting
+const foramtErrorMessage = (errorConfig: any, errorMate: any): string => {
+  if (typeof errorConfig.message === "function") {
+    const field = errorMate.target?.[0] || "unknown field";
+    return errorConfig.message(field);
+  }
+  return errorConfig.message;
+};
 
 const prismaErrorMap = new Map([
   [
@@ -60,29 +94,22 @@ const handlePrismaError = (
 ): ApiError => {
   const errorConfig = prismaErrorMap.get(err.code as PrismaErrorCode);
 
-  if (errorConfig) {
-    const message =
-      typeof errorConfig.message === "function"
-        ? errorConfig.message(
-            err.meta?.target && Array.isArray(err.meta.target)
-              ? err.meta.target[0]
-              : "unknown field"
-          )
-        : errorConfig.message;
+  if (!errorConfig) {
     return new ApiError(
-      message,
-      errorConfig.statusCode,
-      "fail",
-      true,
-      errorConfig.errorCode
+      "Database error",
+      500,
+      "error",
+      false,
+      AppErrorCode.DATABASE_ERROR
     );
   }
+  const message = foramtErrorMessage(errorConfig, err.meta);
   return new ApiError(
-    "Database error",
-    500,
-    "error",
-    false,
-    AppErrorCode.DATABASE_ERROR
+    message,
+    errorConfig.statusCode,
+    "fail",
+    true,
+    errorConfig.errorCode
   );
 };
 
@@ -101,26 +128,12 @@ const handleNonApiError = (err: Error): ApiError => {
 const sendErrorDev = (err: ApiError, res: Response) => {
   console.error("Error (DEV) ", err);
 
-  res.status(err.statusCode).json({
-    status: err.status,
-    error: err,
-    message: err.message,
-    stack: err.stack,
-    timestamp: err.timestamp,
-    errorCode: err.errorCode,
-    details: err.details,
-  });
+  res.status(err.statusCode).json(formatErrorResponse(err, true));
 };
 
 const sendErrorProd = (err: ApiError, res: Response) => {
   if (err.isOperational) {
-    res.status(err.statusCode).json({
-      status: err.status,
-      message: err.message,
-      timestamp: err.timestamp,
-      errorCode: err.errorCode,
-      details: err.details,
-    });
+    res.status(err.statusCode).json(formatErrorResponse(err));
   } else {
     // Programming or unknown errors
     console.error("ERROR 💥", err);

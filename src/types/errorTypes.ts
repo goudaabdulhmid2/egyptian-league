@@ -17,3 +17,13 @@ export enum AppErrorCode {
   VALUE_TOO_LONG = "VALUE_TOO_LONG",
   VALUE_TOO_SHORT = "VALUE_TOO_SHORT",
 }
+
+export interface ErrorResponse {
+  status: string;
+  message: string;
+  timestamp: Date;
+  errorCode?: string;
+  details?: unknown;
+  stack?: string;
+  error?: unknown;
+}
