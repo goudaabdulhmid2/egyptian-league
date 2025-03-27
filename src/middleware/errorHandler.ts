@@ -8,36 +8,6 @@ import {
   ErrorResponse,
 } from "../types/errorTypes";
 
-// Common error response formatter
-const formatErrorResponse = (
-  err: ApiError,
-  includeDetails: boolean = false
-): ErrorResponse => {
-  const response: ErrorResponse = {
-    status: err.status,
-    message: err.message,
-    timestamp: err.timestamp || new Date(),
-    errorCode: err.errorCode,
-    details: err.details,
-  };
-
-  if (includeDetails) {
-    response.stack = err.stack;
-    response.error = err;
-  }
-
-  return response;
-};
-
-// Separate error message formatting
-const foramtErrorMessage = (errorConfig: any, errorMate: any): string => {
-  if (typeof errorConfig.message === "function") {
-    const field = errorMate.target?.[0] || "unknown field";
-    return errorConfig.message(field);
-  }
-  return errorConfig.message;
-};
-
 const prismaErrorMap = new Map([
   [
     PrismaErrorCode.NOT_FOUND,
@@ -129,6 +99,36 @@ const sendErrorDev = (err: ApiError, res: Response) => {
   console.error("Error (DEV) ", err);
 
   res.status(err.statusCode).json(formatErrorResponse(err, true));
+};
+
+// Common error response formatter
+const formatErrorResponse = (
+  err: ApiError,
+  includeDetails: boolean = false
+): ErrorResponse => {
+  const response: ErrorResponse = {
+    status: err.status,
+    message: err.message,
+    timestamp: err.timestamp || new Date(),
+    errorCode: err.errorCode,
+    details: err.details,
+  };
+
+  if (includeDetails) {
+    response.stack = err.stack;
+    response.error = err;
+  }
+
+  return response;
+};
+
+// Separate error message formatting
+const foramtErrorMessage = (errorConfig: any, errorMate: any): string => {
+  if (typeof errorConfig.message === "function") {
+    const field = errorMate.target?.[0] || "unknown field";
+    return errorConfig.message(field);
+  }
+  return errorConfig.message;
 };
 
 const sendErrorProd = (err: ApiError, res: Response) => {
