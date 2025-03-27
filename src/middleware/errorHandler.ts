@@ -6,7 +6,42 @@ import {
   PrismaErrorCode,
   AppErrorCode,
   ErrorResponse,
+  PrismaErrorConfig,
 } from "../types/errorTypes";
+
+// Common error response formatter
+const formatErrorResponse = (
+  err: ApiError,
+  includeDetails: boolean = false
+): ErrorResponse => {
+  const response: ErrorResponse = {
+    status: err.status,
+    message: err.message,
+    timestamp: err.timestamp || new Date(),
+    errorCode: err.errorCode,
+    details: err.details,
+  };
+
+  if (includeDetails) {
+    response.stack = err.stack;
+    response.error = err;
+  }
+
+  return response;
+};
+
+// Separate error message formatting
+const formatErrorMessage = (
+  errorConfig: PrismaErrorConfig,
+  errorMate: Prisma.PrismaClientKnownRequestError["meta"]
+): string => {
+  if (typeof errorConfig.message === "function") {
+    const field =
+      (errorMate?.target as string[] | undefined)?.[0] || "unknown field";
+    return errorConfig.message(field);
+  }
+  return errorConfig.message;
+};
 
 const prismaErrorMap = new Map([
   [
@@ -57,6 +92,14 @@ const prismaErrorMap = new Map([
       errorCode: AppErrorCode.VALUE_TOO_SHORT,
     },
   ],
+  [
+    PrismaErrorCode.INVALID_DATA_TYPE,
+    {
+      message: (field: string) => `Invalid data type for ${field}`,
+      statusCode: 400,
+      errorCode: AppErrorCode.INVALID_DATA_TYPE,
+    },
+  ],
 ]);
 
 const handlePrismaError = (
@@ -73,7 +116,7 @@ const handlePrismaError = (
       AppErrorCode.DATABASE_ERROR
     );
   }
-  const message = foramtErrorMessage(errorConfig, err.meta);
+  const message = formatErrorMessage(errorConfig, err.meta);
   return new ApiError(
     message,
     errorConfig.statusCode,
@@ -92,43 +135,14 @@ const handleNonApiError = (err: Error): ApiError => {
     err.message || "Something went wrong",
     500,
     "error",
-    false
+    false,
+    AppErrorCode.DATABASE_ERROR
   );
 };
 const sendErrorDev = (err: ApiError, res: Response) => {
   console.error("Error (DEV) ", err);
 
   res.status(err.statusCode).json(formatErrorResponse(err, true));
-};
-
-// Common error response formatter
-const formatErrorResponse = (
-  err: ApiError,
-  includeDetails: boolean = false
-): ErrorResponse => {
-  const response: ErrorResponse = {
-    status: err.status,
-    message: err.message,
-    timestamp: err.timestamp || new Date(),
-    errorCode: err.errorCode,
-    details: err.details,
-  };
-
-  if (includeDetails) {
-    response.stack = err.stack;
-    response.error = err;
-  }
-
-  return response;
-};
-
-// Separate error message formatting
-const foramtErrorMessage = (errorConfig: any, errorMate: any): string => {
-  if (typeof errorConfig.message === "function") {
-    const field = errorMate.target?.[0] || "unknown field";
-    return errorConfig.message(field);
-  }
-  return errorConfig.message;
 };
 
 const sendErrorProd = (err: ApiError, res: Response) => {
@@ -141,6 +155,7 @@ const sendErrorProd = (err: ApiError, res: Response) => {
       status: "error",
       message: "Something went wrong",
       timestamp: err.timestamp || new Date(),
+      errorCode: err.errorCode || AppErrorCode.DATABASE_ERROR,
     });
   }
 };
@@ -155,6 +170,8 @@ export default (
 
   if (process.env.NODE_ENV === "development") {
     sendErrorDev(apiError, res);
+  } else if (process.env.NODE_ENV === "production") {
+    sendErrorProd(apiError, res);
   } else {
     sendErrorProd(apiError, res);
   }

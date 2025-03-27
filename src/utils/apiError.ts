@@ -22,7 +22,7 @@ class ApiError extends Error {
     this.isOperational = isOperational;
     this.timestamp = new Date();
     this.errorCode = errorCode;
-    this.details = details;
+    this.details = details || {};
     Error.captureStackTrace(this, this.constructor);
     Object.setPrototypeOf(this, ApiError.prototype);
   }

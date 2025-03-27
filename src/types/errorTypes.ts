@@ -1,3 +1,5 @@
+import ApiError from "../utils/apiError";
+
 export enum PrismaErrorCode {
   NOT_FOUND = "P2025",
   UNIQUE_CONSTRAINT = "P2002",
@@ -5,6 +7,7 @@ export enum PrismaErrorCode {
   VALUE_TOO_LONG = "P2000",
   VALUE_TOO_SHORT = "P2001",
   INVALID_VALUE = "P2004",
+  INVALID_DATA_TYPE = "P2005",
 }
 
 export enum AppErrorCode {
@@ -16,6 +19,7 @@ export enum AppErrorCode {
   INVALID_VALUE = "INVALID_VALUE",
   VALUE_TOO_LONG = "VALUE_TOO_LONG",
   VALUE_TOO_SHORT = "VALUE_TOO_SHORT",
+  INVALID_DATA_TYPE = "INVALID_DATA_TYPE",
 }
 
 export interface ErrorResponse {
@@ -23,7 +27,13 @@ export interface ErrorResponse {
   message: string;
   timestamp: Date;
   errorCode?: string;
-  details?: unknown;
+  details?: Record<string, any>;
   stack?: string;
-  error?: unknown;
+  error?: ApiError;
+}
+
+export interface PrismaErrorConfig {
+  message: string | ((field: string) => string);
+  statusCode: number;
+  errorCode: AppErrorCode;
 }
