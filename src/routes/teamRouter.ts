@@ -7,14 +7,22 @@ import {
   deleteTeamById,
   updateTeamByID,
 } from "../controllers/teamConroller";
+import { validate } from "../middleware/validate";
+import { idSchema } from "../validators/commonValidator";
+import {
+  createTeamSchema,
+  updateTeamSchema,
+} from "../validators/teamValidator";
 
 const router = Router();
 
-router.route("/").get(getAllTeams).post(createTeam);
+router.route("/").get(getAllTeams).post(validate(createTeamSchema), createTeam);
+
+router.use(validate(idSchema));
 router
   .route("/:id")
   .get(getTeamById)
   .delete(deleteTeamById)
-  .patch(updateTeamByID);
+  .patch(validate(updateTeamSchema), updateTeamByID);
 
 export default router;

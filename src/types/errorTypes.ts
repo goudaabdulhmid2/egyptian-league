@@ -1,3 +1,5 @@
+import { ZodError } from "zod";
+
 import ApiError from "../utils/apiError";
 
 export enum PrismaErrorCode {
@@ -29,7 +31,7 @@ export interface ErrorResponse {
   errorCode?: string;
   details?: Record<string, any>;
   stack?: string;
-  error?: ApiError;
+  error?: ApiError | ZodError;
 }
 
 export interface PrismaErrorConfig {

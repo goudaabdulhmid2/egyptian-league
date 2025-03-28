@@ -3,7 +3,14 @@ import asyncHandler from "express-async-handler";
 
 import ApiError from "../utils/apiError";
 import * as teamModel from "../models/teamModel";
-import { Team, TeamUpdateInput, TeamCreateInput } from "../types/teamTypes";
+import { Team } from "../types/teamTypes";
+import {
+  updateTeamSchema,
+  UpdateTeamInput,
+  createTeamSchema,
+  CreateTeamInput,
+} from "../validators/teamValidator";
+import { AppErrorCode } from "../types/errorTypes";
 
 export const getAllTeams = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
@@ -36,7 +43,7 @@ export const getTeamById = asyncHandler(
 
 export const updateTeamByID = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
-    const data: TeamUpdateInput = req.body;
+    const data: UpdateTeamInput = req.body;
 
     const team: Team | null = await teamModel.updateTeam(req.params.id, data);
     if (!team) return next(new ApiError("Team not found.", 404, "fail"));
@@ -65,7 +72,7 @@ export const deleteTeamById = asyncHandler(
 
 export const createTeam = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
-    const data: TeamCreateInput = req.body;
+    const data: CreateTeamInput = req.body;
 
     const newTeam: Team = await teamModel.createTeam(data);
 

@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from "express";
+import { Prisma } from "@prisma/client";
+import { ZodError } from "zod";
 
 import ApiError from "../utils/apiError";
-import { Prisma } from "@prisma/client";
 import {
   PrismaErrorCode,
   AppErrorCode,
@@ -126,10 +127,28 @@ const handlePrismaError = (
   );
 };
 
+const handleValidationError = (err: ZodError): ApiError => {
+  const firstError = err.errors[0];
+  const message = firstError
+    ? `${firstError.message} at ${firstError.path.join(".")}`
+    : "Validation error";
+  return new ApiError(
+    message,
+    400,
+    "fail",
+    true,
+    AppErrorCode.VALIDATION_ERROR,
+    { errors: err.errors }
+  );
+};
+
 const handleNonApiError = (err: Error): ApiError => {
   // Handel Prisma-specific errors
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     return handlePrismaError(err);
+  }
+  if (err instanceof ZodError) {
+    return handleValidationError(err);
   }
   return new ApiError(
     err.message || "Something went wrong",
