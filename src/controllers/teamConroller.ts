@@ -10,7 +10,6 @@ import {
   createTeamSchema,
   CreateTeamInput,
 } from "../validators/teamValidator";
-import { AppErrorCode } from "../types/errorTypes";
 
 export const getAllTeams = asyncHandler(
   async (req: Request, res: Response, next: NextFunction) => {
