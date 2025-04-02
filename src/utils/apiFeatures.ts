@@ -5,7 +5,6 @@ import { AppErrorCode } from "../types/errorTypes";
 /**
  * Interface for pagination results
  */
-
 interface PaginationResult {
   page: number;
   limit: number;
