@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { playerBaseSchema } from "./playervalidator";
+import { playerBaseSchema } from "./playerValidator";
 
 const validShirtColors = [
   "red",

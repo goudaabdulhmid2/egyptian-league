@@ -8,7 +8,7 @@ import {
   updateTeamByID,
 } from "../controllers/teamConroller";
 import { validate } from "../middleware/validate";
-import { idSchema } from "../validators/commonValidator";
+import { idSchema, queryStringSchema } from "../validators/commonValidator";
 import {
   createTeamSchema,
   updateTeamSchema,
@@ -16,7 +16,10 @@ import {
 
 const router = Router();
 
-router.route("/").get(getAllTeams).post(validate(createTeamSchema), createTeam);
+router
+  .route("/")
+  .get(validate(queryStringSchema), getAllTeams)
+  .post(validate(createTeamSchema), createTeam);
 
 router.use(validate(idSchema));
 router

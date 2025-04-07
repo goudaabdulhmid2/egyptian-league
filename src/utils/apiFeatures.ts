@@ -8,7 +8,7 @@ import { AppErrorCode } from "../types/errorTypes";
 interface PaginationResult {
   page: number;
   limit: number;
-  numberOfPage: number;
+  numberOfPages: number;
   nextPage?: number;
   prevPage?: number;
   total: number;
@@ -32,7 +32,7 @@ interface QueryString {
 
 interface ApiResult<T> {
   data: T[];
-  pagination: PaginationResult;
+  pagination?: PaginationResult;
 }
 
 class ApiFeatures<T extends Record<string, any>> {
@@ -50,7 +50,7 @@ class ApiFeatures<T extends Record<string, any>> {
    * Creates an instance of ApiFeatures.
    * @param prisma - PrismaClient instance
    * @param model - Name of the Prisma model to query
-   * @param reqQueryString - Query parameters from the request
+   * @param queryString - Query parameters from the request
    */
 
   constructor(
@@ -215,7 +215,7 @@ class ApiFeatures<T extends Record<string, any>> {
     } catch (err) {
       console.error("Error in sort method:", err);
       throw new ApiError(
-        "`Failed to apply sorting",
+        "Failed to apply sorting",
         500,
         "error",
         true,
@@ -327,7 +327,7 @@ class ApiFeatures<T extends Record<string, any>> {
         this.paginationResult = {
           page,
           limit,
-          numberOfPage: Math.ceil(total / limit),
+          numberOfPages: Math.ceil(total / limit),
           total,
         };
 
@@ -355,7 +355,7 @@ class ApiFeatures<T extends Record<string, any>> {
 
       console.error("Error in paginate method:", err);
       throw new ApiError(
-        `Failed to apply pagination}`,
+        `Failed to apply pagination`,
         500,
         "error",
         true,
@@ -431,6 +431,7 @@ class ApiFeatures<T extends Record<string, any>> {
       if (!this.paginationResult) {
         await this.paginate();
       }
+
       try {
         const data = await (this.prisma as any)[this.modelName].findMany(
           this.queryOptions as any
