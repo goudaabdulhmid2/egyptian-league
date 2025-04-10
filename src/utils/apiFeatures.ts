@@ -17,7 +17,7 @@ interface PaginationResult {
 /**
  * Type for query string parameters
  */
-interface QueryString {
+export interface QueryString {
   [key: string]: any;
   sort?: string;
   page?: string | number;
@@ -30,7 +30,7 @@ interface QueryString {
  * Interface for API features execution result
  */
 
-interface ApiResult<T> {
+export interface ApiResult<T> {
   data: T[];
   pagination?: PaginationResult;
 }
@@ -75,6 +75,7 @@ class ApiFeatures<T extends Record<string, any>> {
    */
   private async validateFields(fields: string[]): Promise<void> {
     try {
+      // Data Model Meta Format
       const dmmf = await (this.prisma as any)._dmmf.modelMap.get(
         this.modelName
       );

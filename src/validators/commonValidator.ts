@@ -55,6 +55,6 @@ export const queryStringSchema = z
       ])
       .optional(),
   })
-  .strict();
+  .strict(); // The .strict() method enforces that no additional properties are allowed in the query parameters beyond those defined in the schema
 
 export type IdInput = z.infer<typeof idSchema>;
