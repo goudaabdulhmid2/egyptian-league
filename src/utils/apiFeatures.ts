@@ -64,56 +64,7 @@ class ApiFeatures<T extends Record<string, any>> {
       select: {},
       skip: undefined,
       take: undefined,
-      include: {},
     };
-  }
-
-  /**
-   * Validates fields against the Prisma model schema
-   * @param fields - Array of field names to validate
-   * @throws ApiError if fields are invalid or validation fails
-   */
-  private async validateFields(fields: string[]): Promise<void> {
-    try {
-      // Data Model Meta Format
-      const dmmf = await (this.prisma as any)._dmmf.modelMap.get(
-        this.modelName
-      );
-      if (!dmmf) {
-        throw new ApiError(
-          `Invalid model name: ${this.modelName}`,
-          400,
-          "fail",
-          true,
-          AppErrorCode.INVALID_MODEL_NAME
-        );
-      }
-
-      const validFields = new Set(
-        dmmf.fields.map((f: { name: any }) => f.name)
-      );
-      const invalidFields = fields.filter((field) => !validFields.has(field));
-
-      if (invalidFields.length > 0) {
-        throw new ApiError(
-          `Invalid fields: ${invalidFields.join(", ")}`,
-          400,
-          "fail",
-          true,
-          AppErrorCode.INVALID_FIELD_NAME,
-          { invalidFields }
-        );
-      }
-    } catch (err) {
-      if (err instanceof ApiError) throw err;
-      throw new ApiError(
-        "Failed to validate fields",
-        500,
-        "error",
-        true,
-        AppErrorCode.FIELD_VALIDATION_ERROR
-      );
-    }
   }
 
   /**
@@ -211,7 +162,7 @@ class ApiFeatures<T extends Record<string, any>> {
 
         this.queryOptions.orderBy = orderBy;
       } else {
-        this.queryOptions.orderBy = { createdAt: "desc" };
+        this.queryOptions.orderBy = { id: "desc" };
       }
     } catch (err) {
       console.error("Error in sort method:", err);
@@ -243,6 +194,8 @@ class ApiFeatures<T extends Record<string, any>> {
         });
 
         this.queryOptions.select = select;
+      } else {
+        delete this.queryOptions.select;
       }
     } catch (err) {
       console.error("Error in limitFields method:", err);
@@ -256,29 +209,6 @@ class ApiFeatures<T extends Record<string, any>> {
       );
     }
 
-    return this;
-  }
-
-  public includeRelations(relations: string[]): ApiFeatures<T> {
-    try {
-      const include =
-        (this.queryOptions.include as Record<string, boolean>) || {};
-
-      relations.forEach((relation) => {
-        include[relation] = true;
-      });
-
-      this.queryOptions.include = include;
-    } catch (err) {
-      throw new ApiError(
-        "Failed to include relations",
-        500,
-        "error",
-        true,
-        AppErrorCode.RELATION_INCLUDE_ERROR,
-        { relations }
-      );
-    }
     return this;
   }
 
@@ -340,6 +270,7 @@ class ApiFeatures<T extends Record<string, any>> {
           this.paginationResult.prevPage = page - 1;
         }
       } catch (countError) {
+        console.error("Error counting records:", countError);
         throw new ApiError(
           `Failed to count total records`,
           500,
@@ -425,10 +356,6 @@ class ApiFeatures<T extends Record<string, any>> {
 
   public async execute(): Promise<ApiResult<T>> {
     try {
-      if (this.queryOptions.select) {
-        await this.validateFields(Object.keys(this.queryOptions.select));
-      }
-
       if (!this.paginationResult) {
         await this.paginate();
       }
@@ -443,11 +370,12 @@ class ApiFeatures<T extends Record<string, any>> {
           pagination: this.paginationResult!,
         };
       } catch (queryError) {
+        console.error("Database query error:", queryError);
         throw new ApiError(
           `Database query failed`,
           500,
           "error",
-          false, // Not operational as it might be a system/DB error
+          false,
           AppErrorCode.DATABASE_QUERY_ERROR,
           { model: this.modelName, query: this.queryOptions }
         );

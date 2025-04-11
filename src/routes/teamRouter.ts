@@ -5,8 +5,8 @@ import {
   getTeamById,
   createTeam,
   deleteTeamById,
-  updateTeamByID,
-} from "../controllers/teamConroller";
+  updateTeamById,
+} from "../controllers/teamController";
 import { validate } from "../middleware/validate";
 import { idSchema, queryStringSchema } from "../validators/commonValidator";
 import {
@@ -26,6 +26,6 @@ router
   .route("/:id")
   .get(getTeamById)
   .delete(deleteTeamById)
-  .patch(validate(updateTeamSchema), updateTeamByID);
+  .patch(validate(updateTeamSchema), updateTeamById);
 
 export default router;
