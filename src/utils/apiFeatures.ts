@@ -1,7 +1,8 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-
 import ApiError from "./apiError";
 import { AppErrorCode } from "../types/errorTypes";
+import logger from "../utils/logger";
+
 /**
  * Interface for pagination results
  */
@@ -29,12 +30,14 @@ export interface QueryString {
 /**
  * Interface for API features execution result
  */
-
 export interface ApiResult<T> {
   data: T[];
   pagination?: PaginationResult;
 }
 
+/**
+ * Streamlined ApiFeatures class with reduced error handling redundancy
+ */
 class ApiFeatures<T extends Record<string, any>> {
   private queryOptions: Prisma.JsonObject;
   private paginationResult: PaginationResult | null = null;
@@ -45,14 +48,14 @@ class ApiFeatures<T extends Record<string, any>> {
     "fields",
     "keyword",
   ];
+  private validFields: Set<string> | null = null;
 
   /**
    * Creates an instance of ApiFeatures.
-   * @param prisma - PrismaClient instance
-   * @param model - Name of the Prisma model to query
-   * @param queryString - Query parameters from the request
+   * @param prisma - PrismaClient instance.
+   * @param queryString - Query parameters from the request.
+   * @param modelName - Name of the Prisma model to query.
    */
-
   constructor(
     private readonly prisma: PrismaClient,
     private readonly queryString: QueryString,
@@ -68,54 +71,108 @@ class ApiFeatures<T extends Record<string, any>> {
   }
 
   /**
-   * Applies filters to the query based on request query parameters
-   * Handles operators like gt, gte, lt, lte
-   * @returns The current ApiFeatures instance for chaining
+   * Fetches and caches the fields of the Prisma model dynamically.
+   * @returns A Set of field names for the model.
+   * @throws {ApiError} If the model schema cannot be fetched.
    */
 
-  public filter(): ApiFeatures<T> {
-    try {
-      const queryObject = { ...this.queryString };
-      this.excludedFields.forEach((field) => delete queryObject[field]);
+  private async fetchModelFields(): Promise<Set<string>> {
+    // Return cached fields if available
+    if (this.validFields) return this.validFields;
 
-      const where: Record<string, any> = {};
+    // Fetch one record with all fields to infer the schema
+    const record = await (this.prisma as any)[this.modelName].findFirst({
+      take: 1,
+    });
 
-      Object.entries(queryObject).forEach(([key, value]) => {
-        if (typeof value === "object" && value !== null) {
-          const conditions: Record<string, any> = {};
-
-          Object.entries(value).forEach(([operator, operatorValue]) => {
-            switch (operator) {
-              case "gt":
-              case "gte":
-              case "lt":
-              case "lte":
-                conditions[operator] = operatorValue;
-                break;
-              default:
-                where[key] = value;
-            }
-          });
-
-          if (Object.keys(conditions).length > 0) {
-            where[key] = conditions;
-          }
-        } else {
-          where[key] = value;
+    if (!record) {
+      // If no records exist, we can't infer the schema dynamically
+      logger.warn(
+        `No records found for model ${this.modelName} to infer schema`,
+        {
+          modelName: this.modelName,
         }
-      });
-      this.queryOptions.where = where;
-    } catch (err) {
-      console.error("Error in filter method", err);
+      );
+      // Fallback to a minimal set of fields
+      this.validFields = new Set(["id"]);
+      return this.validFields;
+    }
+
+    // Extrect field names from the record
+    const fields = new Set(Object.keys(record));
+    this.validFields = fields;
+    logger.debug(`Fetched model fields for ${this.modelName}`, {
+      fields: Array.from(fields),
+      modelName: this.modelName,
+    });
+    return fields;
+  }
+
+  /**
+   * Validates that fields exist in the Prisma model schema.
+   * @param fields - The fields to validate.
+   * @throws {ApiError} If any field does not exist in the model schema.
+   */
+  private async validateFields(fields: string[]): Promise<void> {
+    const validFields = await this.fetchModelFields();
+    const invalidFields = fields.filter((field) => !validFields.has(field));
+
+    if (invalidFields.length > 0) {
       throw new ApiError(
-        `Failed to apply filters`,
-        500,
-        "error",
+        `Invalid fields: ${invalidFields.join(", ")}`,
+        400,
+        "fail",
         true,
-        AppErrorCode.API_FEATURES_FILTER_ERROR,
-        { queryString: this.queryString }
+        AppErrorCode.INVALID_FIELD_NAME,
+        { invalidFields }
       );
     }
+  }
+
+  /**
+   * Applies filters to the query based on request query parameters
+   * @returns The current ApiFeatures instance for chaining
+   */
+  public async filter(): Promise<ApiFeatures<T>> {
+    const queryObject = { ...this.queryString };
+    this.excludedFields.forEach((field) => delete queryObject[field]);
+
+    const fieldsToValidate = Object.keys(queryObject);
+    if (fieldsToValidate.length > 0)
+      await this.validateFields(fieldsToValidate);
+
+    const where: Record<string, any> = {};
+
+    Object.entries(queryObject).forEach(([key, value]) => {
+      if (typeof value === "object" && value !== null) {
+        const conditions: Record<string, any> = {};
+
+        Object.entries(value).forEach(([operator, operatorValue]) => {
+          switch (operator) {
+            case "gt":
+            case "gte":
+            case "lt":
+            case "lte":
+              conditions[operator] = operatorValue;
+              break;
+            default:
+              where[key] = value;
+          }
+        });
+
+        if (Object.keys(conditions).length > 0) {
+          where[key] = conditions;
+        }
+      } else {
+        where[key] = value;
+      }
+    });
+
+    this.queryOptions.where = where;
+    logger.debug(`Applied filters for ${this.modelName}`, {
+      filters: where,
+      modelName: this.modelName,
+    });
 
     return this;
   }
@@ -124,90 +181,82 @@ class ApiFeatures<T extends Record<string, any>> {
    * Adds complex filter conditions to the query
    * @param condition - Complex filter condition as a Prisma JSON object
    * @returns The current ApiFeatures instance for chaining
-   * @throws ApiError if filter application fails
    */
   public addComplexFilter(condition: Prisma.JsonObject): ApiFeatures<T> {
-    try {
-      this.queryOptions.where = {
-        AND: [this.queryOptions.where || {}, condition],
-      };
-      return this;
-    } catch (err) {
-      throw new ApiError(
-        "Failed to add complex filter",
-        500,
-        "error",
-        true,
-        AppErrorCode.COMPLEX_FILTER_ERROR,
-        { condition }
-      );
-    }
+    this.queryOptions.where = {
+      AND: [this.queryOptions.where || {}, condition],
+    };
+
+    logger.debug(`Added complex filter for ${this.modelName}`, {
+      condition,
+      modelName: this.modelName,
+    });
+
+    return this;
   }
 
   /**
    * Applies sorting to the query based on the sort parameter
    * @returns The current ApiFeatures instance for chaining
    */
-  public sort(): ApiFeatures<T> {
-    try {
-      if (this.queryString.sort) {
-        const sortFields = this.queryString.sort.toString().split(",");
-        const orderBy: Record<string, string> = {};
+  public async sort(): Promise<ApiFeatures<T>> {
+    if (this.queryString.sort) {
+      const sortFields = this.queryString.sort.toString().split(",");
+      const cleanFields = sortFields.map((f) => f.replace("-", ""));
 
-        sortFields.forEach((field) => {
-          const order = field.startsWith("-") ? "desc" : "asc";
-          const cleanField = field.replace("-", "");
-          orderBy[cleanField] = order;
-        });
+      // Validate sort fields
+      await this.validateFields(cleanFields);
 
-        this.queryOptions.orderBy = orderBy;
-      } else {
-        this.queryOptions.orderBy = { id: "desc" };
-      }
-    } catch (err) {
-      console.error("Error in sort method:", err);
-      throw new ApiError(
-        "Failed to apply sorting",
-        500,
-        "error",
-        true,
-        AppErrorCode.API_FEATURES_SORT_ERROR,
-        { sortParam: this.queryString.sort }
-      );
+      const orderBy: Record<string, string> = {};
+
+      sortFields.forEach((field) => {
+        const order = field.startsWith("-") ? "desc" : "asc";
+        const cleanField = field.replace("-", "");
+        orderBy[cleanField] = order;
+      });
+
+      this.queryOptions.orderBy = orderBy;
+    } else {
+      // Default sorting
+      this.queryOptions.orderBy = { id: "desc" };
     }
+
+    logger.debug(`Applied sorting for ${this.modelName}`, {
+      orderBy: this.queryOptions.orderBy,
+      modelName: this.modelName,
+    });
 
     return this;
   }
-
   /**
    * Limits the fields returned in the query result
    * @returns The current ApiFeatures instance for chaining
    */
-  public limitFields(): ApiFeatures<T> {
-    try {
-      if (this.queryString.fields) {
-        const fields = this.queryString.fields.toString().split(",");
-        const select: Record<string, boolean> = {};
+  public async limitFields(): Promise<ApiFeatures<T>> {
+    if (this.queryString.fields) {
+      const fields = this.queryString.fields
+        .toString()
+        .split(",")
+        .map((f) => f.trim());
 
-        fields.forEach((field) => {
-          select[field.trim()] = true;
-        });
+      // Validate field names
+      await this.validateFields(fields);
 
-        this.queryOptions.select = select;
-      } else {
-        delete this.queryOptions.select;
-      }
-    } catch (err) {
-      console.error("Error in limitFields method:", err);
-      throw new ApiError(
-        `Failed to limit fields`,
-        500,
-        "error",
-        true,
-        AppErrorCode.API_FEATURES_FIELDS_ERROR,
-        { fieldsParam: this.queryString.fields }
-      );
+      const select: Record<string, boolean> = {};
+
+      fields.forEach((field) => {
+        select[field] = true;
+      });
+
+      this.queryOptions.select = select;
+    } else {
+      delete this.queryOptions.select;
     }
+
+    logger.debug(`Limited fields for ${this.modelName}`, {
+      select: this.queryOptions.select,
+      modelName: this.modelName,
+    });
 
     return this;
   }
@@ -217,84 +266,74 @@ class ApiFeatures<T extends Record<string, any>> {
    * @returns Promise resolving to the current ApiFeatures instance for chaining
    */
   public async paginate(): Promise<ApiFeatures<T>> {
-    try {
-      const page = Number(this.queryString.page) || 1;
-      const limit = Number(this.queryString.limit) || 50;
+    // Convert to numbers, handling both string and number inputs
+    const page =
+      typeof this.queryString.page === "number"
+        ? this.queryString.page
+        : Number(this.queryString.page) || 1;
 
-      if (page < 1) {
-        throw new ApiError(
-          "Page number must be at least 1",
-          400,
-          "fail",
-          true,
-          AppErrorCode.INVALID_PAGE_NUMBER,
-          { page }
-        );
-      }
+    const limit =
+      typeof this.queryString.limit === "number"
+        ? this.queryString.limit
+        : Number(this.queryString.limit) || 50;
 
-      if (limit < 1 || limit > 100) {
-        throw new ApiError(
-          "Limit must be between 1 and 100",
-          400,
-          "fail",
-          true,
-          AppErrorCode.INVALID_LIMIT_VALUE,
-          { limit }
-        );
-      }
-
-      const skip = (page - 1) * limit;
-
-      try {
-        const total = await (this.prisma as any)[this.modelName].count({
-          where: this.queryOptions.where as any,
-        });
-
-        this.queryOptions.skip = skip;
-        this.queryOptions.take = limit;
-
-        const endIndex = page * limit;
-
-        this.paginationResult = {
-          page,
-          limit,
-          numberOfPages: Math.ceil(total / limit),
-          total,
-        };
-
-        if (endIndex < total) {
-          this.paginationResult.nextPage = page + 1;
-        }
-
-        if (skip > 0) {
-          this.paginationResult.prevPage = page - 1;
-        }
-      } catch (countError) {
-        console.error("Error counting records:", countError);
-        throw new ApiError(
-          `Failed to count total records`,
-          500,
-          "error",
-          true,
-          AppErrorCode.DATABASE_COUNT_ERROR,
-          { model: this.modelName }
-        );
-      }
-    } catch (err) {
-      if (err instanceof ApiError) {
-        throw err; // Re-throw if it's already an ApiError
-      }
-
-      console.error("Error in paginate method:", err);
+    // Validate pagination parameters
+    if (page < 1) {
       throw new ApiError(
-        `Failed to apply pagination`,
-        500,
-        "error",
+        "Page number must be at least 1",
+        400,
+        "fail",
         true,
-        AppErrorCode.API_FEATURES_PAGINATION_ERROR,
-        { page: this.queryString.page, limit: this.queryString.limit }
+        AppErrorCode.INVALID_PAGE_NUMBER,
+        { page }
       );
     }
+
+    if (limit < 1 || limit > 100) {
+      throw new ApiError(
+        "Limit must be between 1 and 100",
+        400,
+        "fail",
+        true,
+        AppErrorCode.INVALID_LIMIT_VALUE,
+        { limit }
+      );
+    }
+
+    const skip = (page - 1) * limit;
+
+    // Count total records - any Prisma errors will be caught by global handler
+    const total = await (this.prisma as any)[this.modelName].count({
+      where: this.queryOptions.where as any,
+    });
+
+    this.queryOptions.skip = skip;
+    this.queryOptions.take = limit;
+
+    const endIndex = page * limit;
+
+    this.paginationResult = {
+      page,
+      limit,
+      numberOfPages: Math.ceil(total / limit),
+      total,
+    };
+
+    if (endIndex < total) {
+      this.paginationResult.nextPage = page + 1;
+    }
+
+    if (skip > 0) {
+      this.paginationResult.prevPage = page - 1;
+    }
+
+    logger.debug(`Applied pagination for ${this.modelName}`, {
+      page,
+      limit,
+      skip,
+      total,
+      modelName: this.modelName,
+    });
 
     return this;
   }
@@ -304,48 +343,41 @@ class ApiFeatures<T extends Record<string, any>> {
    * @param field - The field to search in, defaults to 'name'
    * @returns The current ApiFeatures instance for chaining
    */
+  public async keywordSearch(field: string = "name"): Promise<ApiFeatures<T>> {
+    if (this.queryString.keyword) {
+      const keyword = this.queryString.keyword.toString().trim();
 
-  public keywordSearch(field: string = "name"): ApiFeatures<T> {
-    try {
-      if (this.queryString.keyword) {
-        const keyWord = this.queryString.keyword.toString().trim();
-
-        if (keyWord.length < 1) {
-          throw new ApiError(
-            "Search keyword cannot be empty",
-            400,
-            "fail",
-            true,
-            AppErrorCode.EMPTY_KEYWORD,
-            { field }
-          );
-        }
-
-        const existingWhere = (this.queryOptions.where as object) || {};
-
-        this.queryOptions.where = {
-          ...existingWhere,
-          [field]: {
-            contains: keyWord,
-            mode: "insensitive",
-          },
-        };
-      }
-    } catch (err) {
-      if (err instanceof ApiError) {
-        throw err; // Re-throw if it's already an ApiError
+      if (keyword.length < 1) {
+        throw new ApiError(
+          "Search keyword cannot be empty",
+          400,
+          "fail",
+          true,
+          AppErrorCode.EMPTY_KEYWORD,
+          { field }
+        );
       }
 
-      console.error("Error in keywordSearch method:", err);
-      throw new ApiError(
-        `Failed to apply keyword search`,
-        500,
-        "error",
-        true,
-        AppErrorCode.API_FEATURES_KEYWORD_ERROR,
-        { keyword: this.queryString.keyword, field }
-      );
+      // Validate the search field exists in the model
+      await this.validateFields([field]);
+
+      const existingWhere = (this.queryOptions.where as object) || {};
+
+      this.queryOptions.where = {
+        ...existingWhere,
+        [field]: {
+          contains: keyword,
+          mode: "insensitive",
+        },
+      };
+
+      logger.debug(`Applied keyword search for ${this.modelName}`, {
+        field,
+        keyword,
+        modelName: this.modelName,
+      });
     }
+
     return this;
   }
 
@@ -353,68 +385,51 @@ class ApiFeatures<T extends Record<string, any>> {
    * Executes the query with all applied features
    * @returns Promise resolving to the query results and pagination info
    */
-
   public async execute(): Promise<ApiResult<T>> {
-    try {
-      if (!this.paginationResult) {
-        await this.paginate();
-      }
-
-      try {
-        const data = await (this.prisma as any)[this.modelName].findMany(
-          this.queryOptions as any
-        );
-
-        return {
-          data,
-          pagination: this.paginationResult!,
-        };
-      } catch (queryError) {
-        console.error("Database query error:", queryError);
-        throw new ApiError(
-          `Database query failed`,
-          500,
-          "error",
-          false,
-          AppErrorCode.DATABASE_QUERY_ERROR,
-          { model: this.modelName, query: this.queryOptions }
-        );
-      }
-    } catch (err) {
-      if (err instanceof ApiError) {
-        throw err; // Re-throw if it's already an ApiError
-      }
-
-      console.error("Error executing query:", err);
-      throw new ApiError(
-        `Failed to execute query: ${err}`,
-        500,
-        "error",
-        true,
-        AppErrorCode.API_FEATURES_EXECUTION_ERROR
-      );
+    // Ensure pagination is applied
+    if (!this.paginationResult) {
+      await this.paginate();
     }
+
+    const startTime = Date.now();
+    // Execute the query - any Prisma errors will be caught by global handler
+    const data = await (this.prisma as any)[this.modelName].findMany(
+      this.queryOptions as any
+    );
+
+    const duration = Date.now() - startTime;
+    logger.info(`Executed query for ${this.modelName}`, {
+      count: data.length,
+      durationMs: duration,
+      modelName: this.modelName,
+    });
+
+    return {
+      data,
+      pagination: this.paginationResult!,
+    };
   }
 
   /**
    * Executes the query within a transaction
    * @returns Promise resolving to the query results and pagination info
-   * @throws ApiError if transaction or query execution fails
    */
   public async executeWithTransaction(): Promise<ApiResult<T>> {
     return await this.prisma.$transaction(async (tx) => {
       const tempPrisma = tx as unknown as PrismaClient;
-      const originalPrisma = this.prisma;
-      (this.prisma as any) = tempPrisma;
 
-      try {
-        const result = await this.execute();
-        (this.prisma as any) = originalPrisma;
-        return result;
-      } catch (err) {
-        (this.prisma as any) = originalPrisma;
-        throw err;
-      }
+      // Create a new instance to work with the transaction
+      const featuresInTransaction = new ApiFeatures<T>(
+        tempPrisma,
+        this.queryString,
+        this.modelName
+      );
+
+      // Copy the query options
+      Object.assign(featuresInTransaction.queryOptions, this.queryOptions);
+
+      // Execute within transaction context
+      return await featuresInTransaction.execute();
     });
   }
 

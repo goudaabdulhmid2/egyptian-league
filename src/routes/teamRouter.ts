@@ -7,7 +7,12 @@ import {
   deleteTeamById,
   updateTeamById,
 } from "../controllers/teamController";
-import { validate } from "../middleware/validate";
+import {
+  validateBody,
+  validateParams,
+  validateQuery,
+  validate,
+} from "../middleware/validate";
 import { idSchema, queryStringSchema } from "../validators/commonValidator";
 import {
   createTeamSchema,
@@ -18,14 +23,13 @@ const router = Router();
 
 router
   .route("/")
-  .get(validate(queryStringSchema), getAllTeams)
-  .post(validate(createTeamSchema), createTeam);
+  .get(validateQuery(queryStringSchema), getAllTeams)
+  .post(validateBody(createTeamSchema), createTeam);
 
-router.use(validate(idSchema));
 router
   .route("/:id")
-  .get(getTeamById)
-  .delete(deleteTeamById)
-  .patch(validate(updateTeamSchema), updateTeamById);
+  .get(validateParams(idSchema), getTeamById)
+  .delete(validateParams(idSchema), deleteTeamById)
+  .patch(validateBody(updateTeamSchema), updateTeamById);
 
 export default router;

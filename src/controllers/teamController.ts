@@ -4,6 +4,7 @@ import { ApiResult } from "../utils/apiFeatures";
 import { Team } from "../types/teamTypes";
 import teamService from "../services/teamService";
 import { UpdateTeamInput, CreateTeamInput } from "../validators/teamValidator";
+import logger from "../utils/logger";
 
 // Get all teams with pagination and filters
 export const getAllTeams = asyncHandler(
@@ -22,6 +23,7 @@ export const getAllTeams = asyncHandler(
 // Get single team by ID with players
 export const getTeamById = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
+    logger.info(`Fetching team with ID: ${req.params.id}`);
     const team = await teamService.getTeamWithPlayers(req.params.id);
 
     res.status(200).json({
