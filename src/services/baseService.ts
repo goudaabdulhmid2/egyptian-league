@@ -107,12 +107,11 @@ const createBaseService = <T extends Record<string, any>>(
       });
       const startTime = Date.now();
 
-      let features = new ApiFeatures<T>(prisma, queryString, modelName);
-      features = await features.filter();
-      features = await features.sort();
-      features = await features.limitFields();
-      features = await features.keywordSearch();
-      features = await features.paginate();
+      const features = new ApiFeatures<T>(prisma, queryString, modelName)
+        .filter()
+        .sort()
+        .limitFields()
+        .keywordSearch();
       const result = await features.execute();
       const duration = Date.now() - startTime;
 

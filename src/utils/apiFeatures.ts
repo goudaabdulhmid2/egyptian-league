@@ -2,6 +2,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import ApiError from "./apiError";
 import { AppErrorCode } from "../types/errorTypes";
 import logger from "../utils/logger";
+import { modelFields } from "./modelFields";
 
 /**
  * Interface for pagination results
@@ -76,36 +77,27 @@ class ApiFeatures<T extends Record<string, any>> {
    * @throws {ApiError} If the model schema cannot be fetched.
    */
 
-  private async fetchModelFields(): Promise<Set<string>> {
+  private fetchModelFields(): Set<string> {
     // Return cached fields if available
     if (this.validFields) return this.validFields;
 
-    // Fetch one record with all fields to infer the schema
-    const record = await (this.prisma as any)[this.modelName].findFirst({
-      take: 1,
-    });
-
-    if (!record) {
-      // If no records exist, we can't infer the schema dynamically
-      logger.warn(
-        `No records found for model ${this.modelName} to infer schema`,
-        {
-          modelName: this.modelName,
-        }
+    const fields = modelFields[this.modelName] || undefined;
+    if (!fields) {
+      throw new ApiError(
+        `Invalid model name: ${this.modelName}`,
+        500,
+        "error",
+        false,
+        AppErrorCode.INTERNAL_SERVER_ERROR
       );
-      // Fallback to a minimal set of fields
-      this.validFields = new Set(["id"]);
-      return this.validFields;
     }
 
-    // Extrect field names from the record
-    const fields = new Set(Object.keys(record));
-    this.validFields = fields;
+    this.validFields = new Set(fields);
     logger.debug(`Fetched model fields for ${this.modelName}`, {
       fields: Array.from(fields),
       modelName: this.modelName,
     });
-    return fields;
+    return this.validFields;
   }
 
   /**
@@ -113,8 +105,8 @@ class ApiFeatures<T extends Record<string, any>> {
    * @param fields - The fields to validate.
    * @throws {ApiError} If any field does not exist in the model schema.
    */
-  private async validateFields(fields: string[]): Promise<void> {
-    const validFields = await this.fetchModelFields();
+  private validateFields(fields: string[]): void {
+    const validFields = this.fetchModelFields();
     const invalidFields = fields.filter((field) => !validFields.has(field));
 
     if (invalidFields.length > 0) {
@@ -133,13 +125,12 @@ class ApiFeatures<T extends Record<string, any>> {
    * Applies filters to the query based on request query parameters
    * @returns The current ApiFeatures instance for chaining
    */
-  public async filter(): Promise<ApiFeatures<T>> {
+  public filter(): ApiFeatures<T> {
     const queryObject = { ...this.queryString };
     this.excludedFields.forEach((field) => delete queryObject[field]);
 
     const fieldsToValidate = Object.keys(queryObject);
-    if (fieldsToValidate.length > 0)
-      await this.validateFields(fieldsToValidate);
+    if (fieldsToValidate.length > 0) this.validateFields(fieldsToValidate);
 
     const where: Record<string, any> = {};
 
@@ -199,13 +190,13 @@ class ApiFeatures<T extends Record<string, any>> {
    * Applies sorting to the query based on the sort parameter
    * @returns The current ApiFeatures instance for chaining
    */
-  public async sort(): Promise<ApiFeatures<T>> {
+  public sort(): ApiFeatures<T> {
     if (this.queryString.sort) {
       const sortFields = this.queryString.sort.toString().split(",");
       const cleanFields = sortFields.map((f) => f.replace("-", ""));
 
       // Validate sort fields
-      await this.validateFields(cleanFields);
+      this.validateFields(cleanFields);
 
       const orderBy: Record<string, string> = {};
 
@@ -232,7 +223,7 @@ class ApiFeatures<T extends Record<string, any>> {
    * Limits the fields returned in the query result
    * @returns The current ApiFeatures instance for chaining
    */
-  public async limitFields(): Promise<ApiFeatures<T>> {
+  public limitFields(): ApiFeatures<T> {
     if (this.queryString.fields) {
       const fields = this.queryString.fields
         .toString()
@@ -240,7 +231,7 @@ class ApiFeatures<T extends Record<string, any>> {
         .map((f) => f.trim());
 
       // Validate field names
-      await this.validateFields(fields);
+      this.validateFields(fields);
 
       const select: Record<string, boolean> = {};
 
@@ -343,7 +334,7 @@ class ApiFeatures<T extends Record<string, any>> {
    * @param field - The field to search in, defaults to 'name'
    * @returns The current ApiFeatures instance for chaining
    */
-  public async keywordSearch(field: string = "name"): Promise<ApiFeatures<T>> {
+  public keywordSearch(field: string = "name"): ApiFeatures<T> {
     if (this.queryString.keyword) {
       const keyword = this.queryString.keyword.toString().trim();
 
@@ -359,7 +350,7 @@ class ApiFeatures<T extends Record<string, any>> {
       }
 
       // Validate the search field exists in the model
-      await this.validateFields([field]);
+      this.validateFields([field]);
 
       const existingWhere = (this.queryOptions.where as object) || {};
 
@@ -393,6 +384,11 @@ class ApiFeatures<T extends Record<string, any>> {
 
     const startTime = Date.now();
     // Execute the query - any Prisma errors will be caught by global handler
+    logger.debug(`Executing query for ${this.modelName}`, {
+      queryOptions: this.queryOptions,
+      modelName: this.modelName,
+    });
+
     const data = await (this.prisma as any)[this.modelName].findMany(
       this.queryOptions as any
     );
