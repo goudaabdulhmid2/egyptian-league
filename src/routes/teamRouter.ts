@@ -1,12 +1,6 @@
 import { Router } from "express";
 
-import {
-  getAllTeams,
-  getTeamById,
-  createTeam,
-  deleteTeamById,
-  updateTeamById,
-} from "../controllers/teamController";
+import teamController from "../controllers/teamController";
 import {
   validateBody,
   validateParams,
@@ -23,13 +17,20 @@ const router = Router();
 
 router
   .route("/")
-  .get(validateQuery(queryStringSchema), getAllTeams)
-  .post(validateBody(createTeamSchema), createTeam);
+  .get(validateQuery(queryStringSchema), teamController.getAll)
+  .post(validateBody(createTeamSchema), teamController.createOne);
 
 router
   .route("/:id")
-  .get(validateParams(idSchema), getTeamById)
-  .delete(validateParams(idSchema), deleteTeamById)
-  .patch(validateBody(updateTeamSchema), updateTeamById);
+  .get(validateParams(idSchema), teamController.getTeamWithPlayers)
+  .delete(validateParams(idSchema), teamController.deleteOne)
+  .patch(validateBody(updateTeamSchema), teamController.updateOne);
+
+router.get("/:id/stats", validateParams(idSchema), teamController.getTeamStats);
+router.get(
+  "/:id/salary",
+  validateParams(idSchema),
+  teamController.getTeamSalary
+);
 
 export default router;

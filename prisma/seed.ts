@@ -3,27 +3,27 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function seed() {
-  await prisma.team.createMany({
-    data: [
-      { id: "1", name: "Al Ahly", shirtColor: "Red" },
-      { id: "2", name: "Zamalek", shirtColor: "White" },
-    ],
-  });
+  // await prisma.team.createMany({
+  //   data: [
+  //     { name: "Man city", shirtColor: "Blue" },
+  //     { name: "Barca", shirtColor: "Red" },
+  //   ],
+  // });
 
   await prisma.player.createMany({
     data: [
       {
-        id: "1",
-        name: "Mohamed Salah",
+        id: "d4fe0692-bf0e-4db2-8723-edadcb57fa53",
+        name: "mo",
         salary: 50000,
-        teamId: "1",
+        teamId: "46e3129d-59ee-4e53-976d-ba053a53a7f0",
         position: "st",
       },
       {
-        id: "2",
-        name: "Ahmed Hassan",
+        id: "d4fe0692-bf0e-4db2-8723-edadcb57fa43",
+        name: "hamid",
         salary: 40000,
-        teamId: "2",
+        teamId: "46e3129d-59ee-4e53-976d-ba053a53a7f0",
         position: "cd",
       },
     ],

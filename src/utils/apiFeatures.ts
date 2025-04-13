@@ -7,7 +7,7 @@ import { modelFields } from "./modelFields";
 /**
  * Interface for pagination results
  */
-interface PaginationResult {
+export interface PaginationResult {
   page: number;
   limit: number;
   numberOfPages: number;
@@ -33,7 +33,7 @@ export interface QueryString {
  */
 export interface ApiResult<T> {
   data: T[];
-  pagination?: PaginationResult;
+  pagination: PaginationResult;
 }
 
 /**

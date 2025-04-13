@@ -8,7 +8,7 @@ import playerService from "./playerService";
 
 // Define types for Team with relations
 interface TeamWithPlayers extends Team {
-  players: Player[];
+  Player: Player[];
 }
 
 interface TeamStats {
@@ -42,11 +42,15 @@ export default {
   async calculateTeamStats(teamId: string): Promise<TeamStats> {
     logger.info("Calculating team statistics", { teamId });
     const team = await this.getTeamWithPlayers(teamId);
-    const totalSalary = team.players.reduce(
-      (sum, player) => sum + player.salary,
-      0
-    );
-    const playerCount = team.players.length;
+
+    logger.debug("Team players array status", {
+      hasPlayers: !!team.Player?.length,
+      playerCount: team.Player?.length || 0,
+      teamId: team.id,
+    });
+    const totalSalary =
+      team.Player?.reduce((sum, player) => sum + player.salary, 0) | 0;
+    const playerCount = team.Player?.length | 0;
 
     return {
       totalSalary,

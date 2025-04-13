@@ -1,80 +1,62 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import asyncHandler from "express-async-handler";
-import { ApiResult } from "../utils/apiFeatures";
+
 import { Team } from "../types/teamTypes";
 import teamService from "../services/teamService";
-import { UpdateTeamInput, CreateTeamInput } from "../validators/teamValidator";
+import createBaseController from "./baseController";
+import { responseUtil } from "../utils/responseUtil";
 import logger from "../utils/logger";
 
-// Get all teams with pagination and filters
-export const getAllTeams = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const result: ApiResult<Team> = await teamService.getAll(req.query);
+const baseTeamController = createBaseController<Team>(teamService, "team");
 
-    res.status(200).json({
-      status: "success",
-      results: result.data.length,
-      pagination: result.pagination,
-      data: result.data,
-    });
-  }
-);
+export default {
+  ...baseTeamController,
 
-// Get single team by ID with players
-export const getTeamById = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    logger.info(`Fetching team with ID: ${req.params.id}`);
-    const team = await teamService.getTeamWithPlayers(req.params.id);
+  /**
+   * Get team with all its players
+   */
+  getTeamWithPlayers: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const id = req.params.id;
+      logger.info("Controller: Getting team with players", { id });
 
-    res.status(200).json({
-      status: "success",
-      data: team,
-    });
-  }
-);
+      const team = await teamService.getTeamWithPlayers(id);
 
-// Update team by ID
-export const updateTeamById = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const data = req.body as UpdateTeamInput;
-    const team = await teamService.updateOne(req.params.id, data);
+      responseUtil.sendSuccess(res, {
+        team,
+      });
+    }
+  ),
 
-    res.status(200).json({
-      status: "success",
-      data: team,
-    });
-  }
-);
+  /**
+   * Get team statistics
+   */
 
-// Delete team by ID
-export const deleteTeamById = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    await teamService.deleteOne(req.params.id);
-    res.status(204).send();
-  }
-);
+  getTeamStats: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const id = req.params.id;
+      logger.info("Controller: Getting team statistics", { id });
 
-// Create new team
-export const createTeam = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const data = req.body as CreateTeamInput;
-    const newTeam = await teamService.createOne(data);
+      const stats = await teamService.calculateTeamStats(id);
+      responseUtil.sendSuccess(res, {
+        teamStats: stats,
+      });
+    }
+  ),
 
-    res.status(201).json({
-      status: "success",
-      data: newTeam,
-    });
-  }
-);
+  /**
+   * Get team total salary
+   */
+  getTeamSalary: asyncHandler(
+    async (req: Request, res: Response, next: NextFunction) => {
+      const { id } = req.params;
+      logger.info("Controller: Getting team salary", { id });
 
-// Get team statistics
-export const getTeamStats = asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const stats = await teamService.calculateTeamStats(req.params.id);
+      const totalSalary = await teamService.calculateTeamSalary(id);
 
-    res.status(200).json({
-      status: "success",
-      data: stats,
-    });
-  }
-);
+      responseUtil.sendSuccess(res, {
+        totalSalary,
+      });
+    }
+  ),
+};
