@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import asyncHandler from "express-async-handler";
 
-import { Team } from "../types/teamTypes";
+import { Team } from "@prisma/client";
 import teamService from "../services/teamService";
 import createBaseController from "./baseController";
 import { responseUtil } from "../utils/responseUtil";

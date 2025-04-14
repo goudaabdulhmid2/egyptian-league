@@ -24,7 +24,14 @@ router
   .route("/:id")
   .get(validateParams(idSchema), teamController.getTeamWithPlayers)
   .delete(validateParams(idSchema), teamController.deleteOne)
-  .patch(validateBody(updateTeamSchema), teamController.updateOne);
+  .patch(
+    validate({
+      params: idSchema,
+      body: updateTeamSchema,
+      validateOnly: ["params", "body"],
+    }),
+    teamController.updateOne
+  );
 
 router.get("/:id/stats", validateParams(idSchema), teamController.getTeamStats);
 router.get(

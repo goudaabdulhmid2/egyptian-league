@@ -5,6 +5,7 @@ import config from "./config/config";
 import errorHandler from "./middleware/errorHandler";
 import ApiError from "./utils/apiError";
 import teamRouter from "./routes/teamRouter";
+import playerRouter from "./routes/playerRouter";
 
 const app = config.getApp();
 
@@ -16,6 +17,7 @@ if (process.env.NODE_ENV === "development") {
 }
 
 app.use("/api/v1/teams", teamRouter);
+app.use("/api/v1/players", playerRouter);
 
 app.all("*", (req: Request, res: Response, next: NextFunction) => {
   next(

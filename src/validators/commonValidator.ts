@@ -42,9 +42,9 @@ export const queryStringSchema = z
       .string()
       .optional()
       .transform((val) => val?.trim()),
-
-    // Dynamic field validation
-    [String(z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/))]: z
+  })
+  .catchall(
+    z
       .union([
         z.string(),
         z.number(),
@@ -53,8 +53,7 @@ export const queryStringSchema = z
           z.union([z.string(), z.number()])
         ),
       ])
-      .optional(),
-  })
-  .strict(); // The .strict() method enforces that no additional properties are allowed in the query parameters beyond those defined in the schema
+      .optional()
+  );
 
 export type IdInput = z.infer<typeof idSchema>;

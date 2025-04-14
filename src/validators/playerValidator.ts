@@ -43,8 +43,8 @@ export const createPlayerSchema = playerBaseSchema.merge(teamIdSchema);
 
 // Update schema
 export const updatePlayerSchema = playerBaseSchema
-  .partial()
-  .merge(teamIdSchema);
+  .merge(teamIdSchema)
+  .partial();
 
 export type CreatePlayerInput = z.infer<typeof createPlayerSchema>;
 export type UpdatePlayerInput = z.infer<typeof updatePlayerSchema>;
